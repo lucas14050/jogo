@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Troll Runner: Armadilhas Sem Fim</title>
+  <style>
+    /* ============================================================
+       RESET E ESTILOS GERAIS
+       ============================================================ */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    body {
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* Container Principal */
+    #game-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 1024px;
+      max-height: 640px;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle at 50% 30%, #171f38 0%, #080c14 100%);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* Barra Superior de Informações (HUD) */
+    #hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 10;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .hud-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.07);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      letter-spacing: 0.5px;
+    }
+
+    .hud-badge.deaths {
+      color: #ff5252;
+      border-color: rgba(255, 82, 82, 0.3);
+      background: rgba(255, 82, 82, 0.1);
+    }
+
+    .hud-badge.level {
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.3);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .hud-badge.time {
+      color: #fbbf24;
+    }
+
+    .hud-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .hud-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+      transform: translateY(-1px);
+    }
+
+    .hud-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* Área do Canvas */
+    #canvas-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #0d121f;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+    }
+
+    /* Notificação Flutuante / Dica Troll */
+    #troll-toast {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(239, 68, 68, 0.95);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      z-index: 15;
+    }
+
+    #troll-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Telas Modais (Menu, Morte, Vitória) */
+    .screen-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 14, 26, 0.92);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      padding: 20px;
+      text-align: center;
+      transition: opacity 0.25s ease, visibility 0.25s;
+    }
+
+    .screen-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Modal de Morte Instantânea */
+    #death-overlay {
+      background: rgba(26, 8, 12, 0.85);
+    }
+
+    .death-title {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ff3344;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-shadow: 0 0 25px rgba(255, 51, 68, 0.8);
+      animation: deathPulse 0.6s infinite alternate;
+      margin-bottom: 8px;
+    }
+
+    @keyframes deathPulse {
+      0% {
+        transform: scale(1);
+        text-shadow: 0 0 15px rgba(255, 51, 68, 0.6);
+      }
+
+      100% {
+        transform: scale(1.04);
+        text-shadow: 0 0 35px rgba(255, 51, 68, 1);
+      }
+    }
+
+    .death-reason {
+      font-size: 16px;
+      color: #fda4af;
+      margin-bottom: 24px;
+      max-width: 450px;
+      line-height: 1.4;
+      font-style: italic;
+    }
+
+    /* Modal Menu Inicial */
+    .menu-title {
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #38bdf8 0%, #ec4899 50%, #facc15 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+      filter: drop-shadow(0 4px 15px rgba(56, 189, 248, 0.3));
+    }
+
+    .menu-subtitle {
+      font-size: 15px;
+      color: #94a3b8;
+      margin-bottom: 26px;
+      max-width: 480px;
+    }
+
+    .controls-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      width: 100%;
+      max-width: 420px;
+      text-align: left;
+    }
+
+    .controls-card h4 {
+      color: #38bdf8;
+      font-size: 14px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .key-badge {
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: monospace;
+      font-weight: bold;
+      color: #f8fafc;
+      box-shadow: 0 2px 0 #0f172a;
+    }
+
+    /* Botões Grandes dos Modais */
+    .btn-action {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 12px 36px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(14, 165, 233, 0.4), 0 2px 0 #0284c7;
+      transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      margin: 6px;
+    }
+
+    .btn-action:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 6px 25px rgba(14, 165, 233, 0.6), 0 2px 0 #0284c7;
+    }
+
+    .btn-action:active {
+      transform: translateY(1px);
+    }
+
+    .btn-action.btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: none;
+      font-size: 14px;
+      padding: 8px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-action.btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .btn-retry {
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Tela de Vitória */
+    .win-trophy {
+      font-size: 64px;
+      margin-bottom: 12px;
+      animation: floatTrophy 2s ease-in-out infinite;
+    }
+
+    @keyframes floatTrophy {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    .win-title {
+      font-size: 38px;
+      font-weight: 900;
+      color: #facc15;
+      margin-bottom: 10px;
+      text-shadow: 0 0 20px rgba(250, 204, 21, 0.6);
+    }
+
+    .win-stats {
+      font-size: 16px;
+      color: #94a3b8;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    /* Controles de Toque para Dispositivos Móveis */
+    #mobile-controls {
+      display: none;
+      position: absolute;
+      bottom: 12px;
+      left: 0;
+      width: 100%;
+      padding: 0 20px;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .touch-cluster {
+      display: flex;
+      gap: 14px;
+      pointer-events: auto;
+    }
+
+    .touch-btn {
+      width: 60px;
+      height: 60px;
+      background: rgba(30, 41, 59, 0.75);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      touch-action: none;
+      transition: background 0.1s, transform 0.1s;
+    }
+
+    .touch-btn:active,
+    .touch-btn.active {
+      background: rgba(56, 189, 248, 0.6);
+      border-color: #38bdf8;
+      transform: scale(0.92);
+    }
+
+    .touch-btn.jump-btn {
+      width: 68px;
+      height: 68px;
+      background: rgba(99, 102, 241, 0.75);
+      border-color: rgba(165, 180, 252, 0.4);
+    }
+
+    .touch-btn.jump-btn:active,
+    .touch-btn.jump-btn.active {
+      background: rgba(129, 140, 248, 0.9);
+      border-color: #fff;
+    }
+
+    /* Mostrar controles de toque em telas menores ou dispositivos touch */
+    @media (hover: none) and (pointer: coarse),
+    (max-width: 820px) {
+      #mobile-controls {
+        display: flex;
+      }
+
+      #hud {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+
+      .hud-badge {
+        padding: 3px 7px;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- CONTAINER DO JOGO -->
+  <div id="game-wrapper">
+
+    <!-- HUD SUPERIOR -->
+    <header id="hud">
+      <div class="hud-group">
+        <div class="hud-badge level" id="hud-level">Fase: 1 / 10</div>
+        <div class="hud-badge deaths" id="hud-deaths">💀 Mortes: 0</div>
+        <div class="hud-badge time" id="hud-time">⏱️ 00:00</div>
+      </div>
+      <div class="hud-group">
+        <button class="hud-btn" id="btn-sound" title="Alternar Som">🔊 Som</button>
+        <button class="hud-btn" id="btn-restart-fast" title="Reiniciar Fase [R]">🔄 Reiniciar</button>
+        <button class="hud-btn" id="btn-menu" title="Menu Principal">☰ Menu</button>
+      </div>
+    </header>
+
+    <!-- ÁREA VISUAL DO JOGO -->
+    <main id="canvas-container">
+      <canvas id="gameCanvas" width="960" height="540"></canvas>
+      <div id="troll-toast">Armadilha Troll Ativada!</div>
+    </main>
+
+    <!-- CONTROLES VIRTUAIS PARA CELULAR -->
+    <nav id="mobile-controls" aria-label="Controles virtuais">
+      <div class="touch-cluster">
+        <button class="touch-btn" id="btn-touch-left" aria-label="Esquerda">◀</button>
+        <button class="touch-btn" id="btn-touch-right" aria-label="Direita">▶</button>
+      </div>
+      <div class="touch-cluster">
+        <button class="touch-btn jump-btn" id="btn-touch-jump" aria-label="Pular">▲</button>
+      </div>
+    </nav>
+
+    <!-- TELA DE MENU INICIAL -->
+    <div class="screen-overlay" id="menu-overlay">
+      <h1 class="menu-title">TROLL RUNNER</h1>
+      <p class="menu-subtitle">Um jogo de plataforma onde você <b>vai</b> morrer. Muitas vezes. Confie em nada nem
+        ninguém!</p>
+
+      <div class="controls-card">
+        <h4>🎮 Como Jogar</h4>
+        <div class="controls-row">
+          <span>Andar Esquerda / Direita:</span>
+          <div><span class="key-badge">A</span> <span class="key-badge">D</span> ou <span class="key-badge">◀</span>
+            <span class="key-badge">▶</span>
+          </div>
+        </div>
+        <div class="controls-row">
+          <span>Pular:</span>
+          <div><span class="key-badge">W</span>, <span class="key-badge">▲</span> ou <span
+              class="key-badge">Espaço</span></div>
+        </div>
+        <div class="controls-row">
+          <span>Reiniciar Rápido:</span>
+          <div><span class="key-badge">R</span></div>
+        </div>
+        <div class="controls-row" style="margin-top: 8px; color: #38bdf8;">
+          <span>📱 No celular: Use os botões na tela.</span>
+        </div>
+      </div>
+
+      <button class="btn-action" id="btn-play-game">JOGAR AGORA</button>
+    </div>
+
+    <!-- TELA DE MORTE -->
+    <div class="screen-overlay hidden" id="death-overlay">
+      <h2 class="death-title">VOCÊ MORREU!</h2>
+      <p class="death-reason" id="death-quote">"Aquele chão parecia bem firme, né?"</p>
+      <div>
+        <button class="btn-action btn-retry" id="btn-retry-game">Tentar Novamente (Espaço / R)</button>
+      </div>
+    </div>
+
+    <!-- TELA DE VITÓRIA FINAL -->
+    <div class="screen-overlay hidden" id="win-overlay">
+      <div class="win-trophy">👑</div>
+      <h2 class="win-title">PARABÉNS! VOCÊ VENCEU!</h2>
+      <p class="win-stats" id="win-summary">
+        Você sobreviveu a todas as 10 fases de armadilhas troll!<br>
+        <b>Total de Mortes:</b> <span id="final-deaths">0</span><br>
+        <b>Tempo Total:</b> <span id="final-time">00:00</span>
+      </p>
+      <button class="btn-action" id="btn-play-again">Jogar Novamente</button>
+    </div>
+
+  </div>
+
+  <!-- CÓDIGO DO JOGO (JAVASCRIPT PURO) -->
+  <script>
+    // Polyfill de compatibilidade para CanvasRenderingContext2D.roundRect
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, radii) {
+        if (!radii) radii = 0;
+        let r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? radii[0] : 0);
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.lineTo(x + w - r, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r);
+        this.lineTo(x + w, y + h - r);
+        this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        this.lineTo(x + r, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r);
+        this.lineTo(x, y + r);
+        this.quadraticCurveTo(x, y, x + r, y);
+        this.closePath();
+      };
+    }
+
+    /* ============================================================
+       1. MOTOR DE ÁUDIO SINTETIZADO (WEB AUDIO API NATIVO)
+       ============================================================ */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.ctx = new AudioContextClass();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      // Som do salto do personagem
+      jump() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(160, t);
+          osc.frequency.exponentialRampToValueAtTime(420, t + 0.12);
+
+          gain.gain.setValueAtTime(0.12, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.12);
+        } catch (e) { }
+      }
+
+      // Som de morte / explosão
+      die() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          // Onda ruidosa / distorção descendente
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(320, t);
+          osc.frequency.exponentialRampToValueAtTime(40, t + 0.28);
+
+          gain.gain.setValueAtTime(0.25, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.3);
+        } catch (e) { }
+      }
+
+      // Som de gatilho de armadilha surpresa
+      trapTrigger() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(600, t);
+          osc.frequency.linearRampToValueAtTime(900, t + 0.08);
+          osc.frequency.linearRampToValueAtTime(300, t + 0.18);
+
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.2);
+        } catch (e) { }
+      }
+
+      // Som de bater a cabeça no bloco invisível ("bonk")
+      bonk() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(480, t);
+          osc.frequency.exponentialRampToValueAtTime(140, t + 0.09);
+
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.09);
+        } catch (e) { }
+      }
+
+      // Risadinha troll / buzina cômica
+      trollLaugh() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(450, t);
+          osc.frequency.linearRampToValueAtTime(320, t + 0.12);
+          osc.frequency.linearRampToValueAtTime(450, t + 0.22);
+          osc.frequency.linearRampToValueAtTime(260, t + 0.35);
+
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.38);
+        } catch (e) { }
+      }
+
+      // Fanfarra ao completar fase
+      levelClear() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+          notes.forEach((freq, idx) => {
+            const t = this.ctx.currentTime + idx * 0.08;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(0.16, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.2);
+          });
+        } catch (e) { }
+      }
+
+      // Vitória completa do jogo
+      gameWon() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const melody = [
+            { f: 392, d: 0.12 }, // G4
+            { f: 523.25, d: 0.12 }, // C5
+            { f: 659.25, d: 0.12 }, // E5
+            { f: 783.99, d: 0.28 }, // G5
+            { f: 659.25, d: 0.12 }, // E5
+            { f: 783.99, d: 0.45 }  // G5 longo
+          ];
+          let curTime = this.ctx.currentTime;
+          melody.forEach(note => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(note.f, curTime);
+            gain.gain.setValueAtTime(0.18, curTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, curTime + note.d);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(curTime);
+            osc.stop(curTime + note.d);
+            curTime += note.d + 0.03;
+          });
+        } catch (e) { }
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* ============================================================
+       2. FRASES SARCÁSTICAS AO MORRER
+       ============================================================ */
+    const DEATH_QUOTES = [
+      "Aquele chão parecia bem firme, né?",
+      "Um clássico bloco invisível mandou lembranças!",
+      "Não olhou para o teto? A gravidade é impiedosa.",
+      "A porta correu de você! Ela tem medo de perdedores.",
+      "Espinhos surpresa: nunca saem de moda!",
+      "Você pisou... e sumiu. Simples assim.",
+      "Cuidado com a cabeça ao tentar bancar o herói!",
+      "Achou que seria fácil? É um jogo troll!",
+      "Essa doeu até em quem programou.",
+      "Tentativa comovente, mas o espinho venceu de novo.",
+      "Quem mandou confiar numa plataforma tão simpática?",
+      "A física desse mundo não respeita as leis de Newton!"
+    ];
+
+    /* ============================================================
+       3. SISTEMA DE PARTÍCULAS
+       ============================================================ */
+    class Particle {
+      constructor(x, y, color, vx, vy, size, life) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = vx;
+        this.vy = vy;
+        this.size = size;
+        this.maxLife = life;
+        this.life = life;
+        this.gravity = 0.2;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.life--;
+      }
+
+      draw(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.restore();
+      }
+    }
+
+    class ParticleSystem {
+      constructor() {
+        this.particles = [];
+      }
+
+      // Explosão ao morrer
+      createDeathExplosion(x, y, color = '#38bdf8') {
+        const colors = [color, '#f43f5e', '#facc15', '#ffffff'];
+        for (let i = 0; i < 35; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 2 + Math.random() * 6;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed - 2;
+          const c = colors[Math.floor(Math.random() * colors.length)];
+          const size = 3 + Math.random() * 5;
+          const life = 25 + Math.random() * 30;
+          this.particles.push(new Particle(x, y, c, vx, vy, size, life));
+        }
+      }
+
+      // Poeira ao pular / aterrissar
+      createDust(x, y) {
+        for (let i = 0; i < 6; i++) {
+          const vx = (Math.random() - 0.5) * 2.5;
+          const vy = -Math.random() * 1.5;
+          this.particles.push(new Particle(x, y, 'rgba(255,255,255,0.6)', vx, vy, 3, 15));
+        }
+      }
+
+      // Confetes de vitória
+      createConfetti(w, h) {
+        const colors = ['#f43f5e', '#38bdf8', '#facc15', '#a855f7', '#22c55e'];
+        for (let i = 0; i < 50; i++) {
+          const x = Math.random() * w;
+          const y = -10 - Math.random() * 50;
+          const vx = (Math.random() - 0.5) * 3;
+          const vy = 1 + Math.random() * 4;
+          const c = colors[Math.floor(Math.random() * colors.length)];
+          const p = new Particle(x, y, c, vx, vy, 5, 80);
+          p.gravity = 0.05;
+          this.particles.push(p);
+        }
+      }
+
+      update() {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          this.particles[i].update();
+          if (this.particles[i].life <= 0) {
+            this.particles.splice(i, 1);
+          }
+        }
+      }
+
+      draw(ctx) {
+        for (let p of this.particles) {
+          p.draw(ctx);
+        }
+      }
+
+      clear() {
+        this.particles = [];
+      }
+    }
+
+    /* ============================================================
+       4. CLASSE DO JOGADOR
+       ============================================================ */
+    class Player {
+      constructor() {
+        this.width = 24;
+        this.height = 28;
+        this.x = 60;
+        this.y = 350;
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 4.2;
+        this.jumpForce = -10.6;
+        this.gravity = 0.52;
+        this.isGrounded = false;
+        this.facing = 1; // 1 = direita, -1 = esquerda
+        this.alive = true;
+        this.gravityInverted = false;
+
+        // Buffers de física responsiva (Coyote Time & Jump Buffer)
+        this.coyoteTime = 0;
+        this.jumpBuffer = 0;
+
+        // Animação de Squash and Stretch
+        this.scaleX = 1;
+        this.scaleY = 1;
+
+        // Olhos e Expressão
+        this.eyeBlinkTimer = 0;
+        this.isBlinking = false;
+      }
+
+      reset(spawnX = 60, spawnY = 350, inverted = false) {
+        this.x = spawnX;
+        this.y = spawnY;
+        this.vx = 0;
+        this.vy = 0;
+        this.isGrounded = false;
+        this.alive = true;
+        this.gravityInverted = inverted;
+        this.coyoteTime = 0;
+        this.jumpBuffer = 0;
+        this.scaleX = 1;
+        this.scaleY = 1;
+      }
+
+      update(input, level) {
+        if (!this.alive) return;
+
+        const effectiveGravity = this.gravityInverted ? -this.gravity : this.gravity;
+        const effectiveJumpForce = this.gravityInverted ? -this.jumpForce : this.jumpForce;
+
+        // Movimentação Horizontal
+        let moveDir = 0;
+        if (input.left) moveDir -= 1;
+        if (input.right) moveDir += 1;
+
+        if (moveDir !== 0) {
+          this.vx = moveDir * this.speed;
+          this.facing = moveDir;
+        } else {
+          this.vx *= 0.72; // Atrito suave
+          if (Math.abs(this.vx) < 0.1) this.vx = 0;
+        }
+
+        // Coyote Time
+        if (this.isGrounded) {
+          this.coyoteTime = 7;
+        } else if (this.coyoteTime > 0) {
+          this.coyoteTime--;
+        }
+
+        // Jump Buffer
+        if (input.jumpJustPressed) {
+          this.jumpBuffer = 6;
+        } else if (this.jumpBuffer > 0) {
+          this.jumpBuffer--;
+        }
+
+        // Executar Pulo
+        if (this.jumpBuffer > 0 && this.coyoteTime > 0) {
+          this.vy = effectiveJumpForce;
+          this.isGrounded = false;
+          this.coyoteTime = 0;
+          this.jumpBuffer = 0;
+          sound.jump();
+
+          // Efeito de esticar ao pular
+          this.scaleX = 0.8;
+          this.scaleY = 1.3;
+          game.particles.createDust(this.x + this.width / 2, this.gravityInverted ? this.y : this.y + this.height);
+        }
+
+        // Pulo com Altura Variável (se soltar tecla de pulo cedo, corta subida)
+        if (!input.jumpPressed) {
+          if (!this.gravityInverted && this.vy < -3.5) {
+            this.vy = -3.5;
+          } else if (this.gravityInverted && this.vy > 3.5) {
+            this.vy = 3.5;
+          }
+        }
+
+        // Aplicação da Gravidade
+        this.vy += effectiveGravity;
+        if (Math.abs(this.vy) > 13) {
+          this.vy = Math.sign(this.vy) * 13;
+        }
+
+        // Efeito de retorno de Squash & Stretch
+        this.scaleX += (1 - this.scaleX) * 0.2;
+        this.scaleY += (1 - this.scaleY) * 0.2;
+
+        // Piscar de olhos
+        this.eyeBlinkTimer++;
+        if (this.eyeBlinkTimer > 160) {
+          this.isBlinking = true;
+          if (this.eyeBlinkTimer > 170) {
+            this.isBlinking = false;
+            this.eyeBlinkTimer = 0;
+          }
+        }
+
+        // Resolução de Colisões nos Eixos X e Y
+        this.moveAndCollide(level);
+
+        // Morte por cair fora do mapa (buracos)
+        if (this.y > 600 || this.y < -100) {
+          game.killPlayer("Caiu direto no abismo! Cuidado com os buracos.");
+        }
+      }
+
+      moveAndCollide(level) {
+        // Colisão no Eixo X
+        this.x += this.vx;
+        let box = this.getHitbox();
+
+        for (let plat of level.platforms) {
+          if (!plat.solid) continue;
+          if (this.checkAABB(box, plat)) {
+            if (this.vx > 0) {
+              this.x = plat.x - this.width;
+            } else if (this.vx < 0) {
+              this.x = plat.x + plat.w;
+            }
+            this.vx = 0;
+            box = this.getHitbox();
+          }
+        }
+
+        // Colisão com Blocos Invisíveis no Eixo X
+        for (let ib of level.invisibleBlocks) {
+          if (!ib.revealed) continue;
+          if (this.checkAABB(box, ib)) {
+            if (this.vx > 0) this.x = ib.x - this.width;
+            else if (this.vx < 0) this.x = ib.x + ib.w;
+            this.vx = 0;
+            box = this.getHitbox();
+          }
+        }
+
+        // Colisão no Eixo Y
+        this.y += this.vy;
+        box = this.getHitbox();
+        this.isGrounded = false;
+
+        for (let plat of level.platforms) {
+          if (!plat.solid) continue;
+          if (this.checkAABB(box, plat)) {
+            if (!this.gravityInverted) {
+              // Gravidade Normal
+              if (this.vy > 0) { // Aterrissando
+                this.y = plat.y - this.height;
+                this.vy = 0;
+                this.isGrounded = true;
+
+                // Efeito ao aterrissar (squash)
+                if (this.scaleY > 1.1) {
+                  this.scaleX = 1.25;
+                  this.scaleY = 0.75;
+                  game.particles.createDust(this.x + this.width / 2, this.y + this.height);
+                }
+
+                // Gatilho de plataformas instáveis ou que caem
+                if (plat.type === 'crumble' && !plat.triggered) {
+                  plat.triggered = true;
+                  plat.shakeTime = 18;
+                  sound.trapTrigger();
+                }
+                if (plat.type === 'vanish' && !plat.triggered) {
+                  plat.triggered = true;
+                  plat.vanishTimer = 14;
+                  sound.trapTrigger();
+                }
+              } else if (this.vy < 0) { // Batendo a cabeça
+                this.y = plat.y + plat.h;
+                this.vy = 0;
+              }
+            } else {
+              // Gravidade Invertida
+              if (this.vy < 0) { // Aterrissando no teto
+                this.y = plat.y + plat.h;
+                this.vy = 0;
+                this.isGrounded = true;
+              } else if (this.vy > 0) { // Batendo os pés no chão inferior
+                this.y = plat.y - this.height;
+                this.vy = 0;
+              }
+            }
+            box = this.getHitbox();
+          }
+        }
+
+        // Colisão com Blocos Invisíveis (Head-bonk troll clássico!)
+        for (let ib of level.invisibleBlocks) {
+          if (this.checkAABB(box, ib)) {
+            if (!this.gravityInverted) {
+              if (this.vy < 0) { // Pulou e bateu a cabeça por baixo!
+                this.y = ib.y + ib.h;
+                this.vy = 1.5;
+                if (!ib.revealed) {
+                  ib.revealed = true;
+                  sound.bonk();
+                  game.showTrollToast("Bloco invisível troll!");
+                }
+              } else if (ib.revealed && this.vy > 0) {
+                this.y = ib.y - this.height;
+                this.vy = 0;
+                this.isGrounded = true;
+              }
+            } else {
+              if (this.vy > 0) {
+                this.y = ib.y - this.height;
+                this.vy = -1.5;
+                if (!ib.revealed) {
+                  ib.revealed = true;
+                  sound.bonk();
+                }
+              }
+            }
+            box = this.getHitbox();
+          }
+        }
+      }
+
+      getHitbox() {
+        return {
+          x: this.x,
+          y: this.y,
+          w: this.width,
+          h: this.height
+        };
+      }
+
+      checkAABB(r1, r2) {
+        return (
+          r1.x < r2.x + r2.w &&
+          r1.x + r1.w > r2.x &&
+          r1.y < r2.y + r2.h &&
+          r1.y + r1.h > r2.y
+        );
+      }
+
+      draw(ctx) {
+        if (!this.alive) return;
+
+        ctx.save();
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        ctx.translate(cx, cy);
+        if (this.gravityInverted) {
+          ctx.scale(1, -1);
+        }
+        ctx.scale(this.facing * this.scaleX, this.scaleY);
+
+        // Corpo do Personagem (Cor vibrante, estilo criatura cibernética / slime fofo)
+        const rad = 6;
+        ctx.fillStyle = '#06b6d4'; // Ciano moderno
+        ctx.beginPath();
+        ctx.roundRect(-this.width / 2, -this.height / 2, this.width, this.height, rad);
+        ctx.fill();
+
+        // Brilho / Detalhe na cabeça
+        ctx.fillStyle = '#67e8f9';
+        ctx.beginPath();
+        ctx.roundRect(-this.width / 2 + 3, -this.height / 2 + 3, this.width - 6, 6, 3);
+        ctx.fill();
+
+        // Olhos Expressivos
+        ctx.fillStyle = '#ffffff';
+        const eyeOffset = 2;
+        const eyeY = -4;
+
+        if (!this.isBlinking) {
+          // Olho Esquerdo
+          ctx.beginPath();
+          ctx.arc(eyeOffset - 1, eyeY, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Olho Direito
+          ctx.beginPath();
+          ctx.arc(eyeOffset + 6, eyeY, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Pupilas olhando na direção do movimento
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(eyeOffset + 0.5, eyeY, 2, 0, Math.PI * 2);
+          ctx.arc(eyeOffset + 7.5, eyeY, 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Olhos fechados (piscando)
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(eyeOffset - 4, eyeY);
+          ctx.lineTo(eyeOffset + 2, eyeY);
+          ctx.moveTo(eyeOffset + 4, eyeY);
+          ctx.lineTo(eyeOffset + 10, eyeY);
+          ctx.stroke();
+        }
+
+        // Bochechas rosadas fofas
+        ctx.fillStyle = 'rgba(244, 63, 94, 0.6)';
+        ctx.beginPath();
+        ctx.arc(-4, 3, 2.5, 0, Math.PI * 2);
+        ctx.arc(8, 3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    /* ============================================================
+       5. DEFINIÇÃO DAS 10 FASES DO JOGO COM ARMADILHAS TROLL
+       ============================================================ */
+    // Cada fase possui geometria, armadilhas originais e mecanismos inesperados
+    const LEVELS = [
+      // FASE 1: O Começo Traiçoeiro (Invisible Block & Popup Spike)
+      {
+        id: 1,
+        title: "1. Bem-vindo ao Troll",
+        quote: "Parece uma fase fácil de videogame antigo... só parece.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 870, y: 400, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 260, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 340, y: 460, w: 180, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 600, y: 460, w: 360, h: 80, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 260, y: 520, w: 80, h: 20, dir: 'up' }, // Fundo do 1º buraco
+          { x: 520, y: 520, w: 80, h: 20, dir: 'up' }, // Fundo do 2º buraco
+          // Espinho surpresa que sobe ao chegar perto da porta
+          { x: 800, y: 460, w: 28, h: 26, dir: 'up', type: 'popup', triggerDist: 90, popped: false }
+        ],
+        invisibleBlocks: [
+          // Bloco invisível bem no meio do pulo do primeiro buraco!
+          { x: 280, y: 350, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [],
+        gravityZones: []
+      },
+
+      // FASE 2: O Chão é Ilusão (Fake Ground & Crumbling Platforms)
+      {
+        id: 2,
+        title: "2. O Chão é uma Mentira",
+        quote: "Nem todo chão foi feito para ser pisado.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 870, y: 330, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 200, h: 80, solid: true, color: '#e2e8f0' },
+          // Chão falso no meio da ponte! Parece sólido, mas não é
+          { x: 200, y: 460, w: 120, h: 80, solid: false, type: 'fake', color: '#e2e8f0' },
+          { x: 320, y: 460, w: 100, h: 80, solid: true, color: '#e2e8f0' },
+          // Plataforma que desmorona ao pisar
+          { x: 480, y: 430, w: 90, h: 24, solid: true, type: 'crumble', color: '#cbd5e1' },
+          { x: 630, y: 390, w: 90, h: 24, solid: true, type: 'crumble', color: '#cbd5e1' },
+          { x: 780, y: 390, w: 180, h: 150, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 200, y: 520, w: 120, h: 20, dir: 'up' },
+          { x: 420, y: 520, w: 360, h: 20, dir: 'up' },
+          { x: 820, y: 390, w: 26, h: 26, dir: 'up', type: 'popup', triggerDist: 80, popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 670, y: 280, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [],
+        gravityZones: []
+      },
+
+      // FASE 3: Ameaça do Teto (Falling Spikes & Ceiling Crusher)
+      {
+        id: 3,
+        title: "3. Olhe Para Cima!",
+        quote: "O perigo nem sempre vem de baixo.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 880, y: 400, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 960, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 320, y: 340, w: 100, h: 20, solid: true, color: '#cbd5e1' },
+          { x: 480, y: 240, w: 120, h: 20, solid: true, color: '#cbd5e1' }
+        ],
+        spikes: [
+          // Espinhos no teto que caem quando o jogador passa embaixo
+          { x: 220, y: 80, w: 26, h: 26, dir: 'down', type: 'falling', triggered: false, vy: 0 },
+          { x: 280, y: 80, w: 26, h: 26, dir: 'down', type: 'falling', triggered: false, vy: 0 },
+          { x: 650, y: 80, w: 26, h: 26, dir: 'down', type: 'falling', triggered: false, vy: 0 },
+          { x: 740, y: 460, w: 30, h: 26, dir: 'up', type: 'popup', triggerDist: 80, popped: false }
+        ],
+        invisibleBlocks: [],
+        crushers: [
+          // Bloco esmagador gigante que despenca do teto!
+          { x: 680, y: 60, w: 90, h: 90, startY: 60, targetY: 370, state: 'idle', triggerX: 620 }
+        ],
+        gravityZones: []
+      },
+
+      // FASE 4: A Porta Fujona (The Runaway Door)
+      {
+        id: 4,
+        title: "4. Cadê a Porta?",
+        quote: "A porta tem pernas e um senso de humor duvidoso.",
+        spawn: { x: 60, y: 400 },
+        door: {
+          x: 880, y: 400, w: 36, h: 54,
+          type: 'runaway',
+          originalX: 880,
+          targetX: 60,
+          fled: false
+        },
+        platforms: [
+          { x: 0, y: 460, w: 160, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 230, y: 420, w: 110, h: 24, solid: true, color: '#cbd5e1' },
+          { x: 410, y: 380, w: 110, h: 24, solid: true, color: '#cbd5e1' },
+          { x: 590, y: 420, w: 110, h: 24, solid: true, color: '#cbd5e1' },
+          { x: 770, y: 460, w: 190, h: 80, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 160, y: 520, w: 610, h: 20, dir: 'up' },
+          // Espinhos surpresa que aparecem DEPOIS que a porta foge de volta!
+          { x: 450, y: 380, w: 28, h: 24, dir: 'up', type: 'popup_on_flee', popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 630, y: 300, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [],
+        gravityZones: []
+      },
+
+      // FASE 5: Plataformas Fantasmas (Vanish Platforms & Moving Walls)
+      {
+        id: 5,
+        title: "5. Pise Rápido!",
+        quote: "Se hesitar por um quarto de segundo, o chão some.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 880, y: 220, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 140, h: 80, solid: true, color: '#e2e8f0' },
+          // Plataformas que somem rapidamente
+          { x: 200, y: 430, w: 75, h: 22, solid: true, type: 'vanish', color: '#93c5fd' },
+          { x: 330, y: 380, w: 75, h: 22, solid: true, type: 'vanish', color: '#93c5fd' },
+          { x: 460, y: 330, w: 75, h: 22, solid: true, type: 'vanish', color: '#93c5fd' },
+          { x: 590, y: 280, w: 75, h: 22, solid: true, type: 'vanish', color: '#93c5fd' },
+          { x: 720, y: 260, w: 80, h: 22, solid: true, color: '#cbd5e1' },
+          { x: 850, y: 280, w: 110, h: 260, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 140, y: 520, w: 710, h: 20, dir: 'up' },
+          { x: 740, y: 260, w: 26, h: 22, dir: 'up', type: 'popup', triggerDist: 70, popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 750, y: 150, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [],
+        gravityZones: []
+      },
+
+      // FASE 6: Gravidade Invertida (Gravity Inversion Zone)
+      {
+        id: 6,
+        title: "6. Mundo Invertido",
+        quote: "Para cima é para baixo, e o teto é o novo chão.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 880, y: 400, w: 36, h: 54 },
+        platforms: [
+          // Chão inicial e final
+          { x: 0, y: 460, w: 180, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 780, y: 460, w: 180, h: 80, solid: true, color: '#e2e8f0' },
+          // Teto no meio onde o jogador deve andar de ponta-cabeça
+          { x: 230, y: 60, w: 500, h: 40, solid: true, color: '#e2e8f0' },
+          // Plataforma suspensa invertida
+          { x: 440, y: 150, w: 80, h: 20, solid: true, color: '#cbd5e1' }
+        ],
+        spikes: [
+          { x: 180, y: 520, w: 600, h: 20, dir: 'up' },
+          // Espinhos no teto
+          { x: 340, y: 100, w: 40, h: 24, dir: 'down' },
+          { x: 580, y: 100, w: 40, h: 24, dir: 'down' }
+        ],
+        invisibleBlocks: [],
+        crushers: [],
+        // Zonas que alteram a gravidade
+        gravityZones: [
+          { x: 180, y: 0, w: 560, h: 540, invert: true, color: 'rgba(168, 85, 247, 0.15)' }
+        ]
+      },
+
+      // FASE 7: Campo Minado de Espinhos (Gauntlet of Pop-up Spikes)
+      {
+        id: 7,
+        title: "7. Passo em Falso",
+        quote: "Parece uma passarela tranquila. Mas nunca confie.",
+        spawn: { x: 50, y: 400 },
+        door: { x: 880, y: 400, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 300, h: 80, solid: true, color: '#e2e8f0' },
+          // Plataforma móvel que vai em direção aos espinhos se subir
+          { x: 320, y: 440, w: 110, h: 24, solid: true, type: 'moving', minX: 320, maxX: 460, speed: 2, color: '#38bdf8' },
+          { x: 500, y: 460, w: 460, h: 80, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          // Sequência de espinhos surpresa ao longo do caminho
+          { x: 130, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false },
+          { x: 210, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false },
+          { x: 580, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false },
+          { x: 670, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false },
+          { x: 760, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 620, y: 350, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [],
+        gravityZones: []
+      },
+
+      // FASE 8: O Esmagador Lateral (Moving Push Wall & Timing)
+      {
+        id: 8,
+        title: "8. A Parede Impaciente",
+        quote: "Você ouviu um barulho de engrenagens?",
+        spawn: { x: 50, y: 400 },
+        door: { x: 880, y: 230, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 200, h: 80, solid: true, color: '#e2e8f0' },
+          { x: 280, y: 410, w: 90, h: 22, solid: true, type: 'crumble', color: '#cbd5e1' },
+          { x: 440, y: 360, w: 90, h: 22, solid: true, color: '#cbd5e1' },
+          { x: 600, y: 310, w: 90, h: 22, solid: true, type: 'crumble', color: '#cbd5e1' },
+          { x: 760, y: 290, w: 200, h: 250, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 200, y: 520, w: 560, h: 20, dir: 'up' },
+          { x: 470, y: 360, w: 26, h: 22, dir: 'up', type: 'popup', triggerDist: 65, popped: false },
+          { x: 800, y: 290, w: 26, h: 22, dir: 'up', type: 'popup', triggerDist: 65, popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 380, y: 290, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [
+          { x: 440, y: 40, w: 90, h: 180, startY: 40, targetY: 200, state: 'idle', triggerX: 410 }
+        ],
+        gravityZones: []
+      },
+
+      // FASE 9: Labirinto dos Falsários (Fake Door & Deception)
+      {
+        id: 9,
+        title: "9. Labirinto da Desilusão",
+        quote: "A primeira porta nem sempre é a verdadeira.",
+        spawn: { x: 50, y: 400 },
+        // A porta verdadeira fica em um recanto superior acessível com paciência
+        door: { x: 880, y: 150, w: 36, h: 54 },
+        platforms: [
+          { x: 0, y: 460, w: 180, h: 80, solid: true, color: '#e2e8f0' },
+          // Caminho de baixo (armadilha mortal)
+          { x: 250, y: 460, w: 300, h: 80, solid: false, type: 'fake', color: '#e2e8f0' },
+          // Caminho do meio
+          { x: 240, y: 370, w: 80, h: 20, solid: true, color: '#cbd5e1' },
+          { x: 390, y: 310, w: 80, h: 20, solid: true, type: 'crumble', color: '#cbd5e1' },
+          { x: 540, y: 250, w: 80, h: 20, solid: true, color: '#cbd5e1' },
+          { x: 680, y: 200, w: 100, h: 20, solid: true, color: '#cbd5e1' },
+          { x: 840, y: 210, w: 120, h: 330, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 180, y: 520, w: 660, h: 20, dir: 'up' },
+          { x: 710, y: 200, w: 26, h: 20, dir: 'up', type: 'popup', triggerDist: 70, popped: false }
+        ],
+        invisibleBlocks: [
+          { x: 320, y: 260, w: 32, h: 30, revealed: false },
+          { x: 620, y: 160, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [
+          { x: 540, y: 20, w: 70, h: 80, startY: 20, targetY: 170, state: 'idle', triggerX: 510 }
+        ],
+        gravityZones: []
+      },
+
+      // FASE 10: O Desafio Final do Troll (The Ultimate Gauntlet)
+      {
+        id: 10,
+        title: "10. O Grande Final Troll",
+        quote: "Junte tudo o que aprendeu... e prepare-se para falhar de novo!",
+        spawn: { x: 50, y: 400 },
+        door: {
+          x: 880, y: 400, w: 36, h: 54,
+          type: 'runaway',
+          originalX: 880,
+          targetX: 740,
+          fled: false
+        },
+        platforms: [
+          { x: 0, y: 460, w: 140, h: 80, solid: true, color: '#e2e8f0' },
+          // Bloco que desmorona
+          { x: 190, y: 420, w: 70, h: 22, solid: true, type: 'crumble', color: '#cbd5e1' },
+          // Plataforma móvel
+          { x: 310, y: 380, w: 80, h: 22, solid: true, type: 'moving', minX: 310, maxX: 430, speed: 2.2, color: '#38bdf8' },
+          // Plataforma que some
+          { x: 490, y: 340, w: 75, h: 22, solid: true, type: 'vanish', color: '#93c5fd' },
+          // Chão do final
+          { x: 640, y: 460, w: 320, h: 80, solid: true, color: '#e2e8f0' }
+        ],
+        spikes: [
+          { x: 140, y: 520, w: 500, h: 20, dir: 'up' },
+          { x: 690, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false },
+          { x: 790, y: 460, w: 26, h: 24, dir: 'up', type: 'popup', triggerDist: 75, popped: false }
+        ],
+        invisibleBlocks: [
+          // Bloco invisível sacana no último pulo!
+          { x: 590, y: 290, w: 32, h: 30, revealed: false }
+        ],
+        crushers: [
+          { x: 740, y: 40, w: 80, h: 120, startY: 40, targetY: 340, state: 'idle', triggerX: 710 }
+        ],
+        gravityZones: []
+      }
+    ];
+
+    /* ============================================================
+       6. GERENCIADOR DO JOGO PRINCIPAL
+       ============================================================ */
+    class Game {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.width = 960;
+        this.height = 540;
+
+        this.player = new Player();
+        this.particles = new ParticleSystem();
+
+        this.currentLevelIndex = 0;
+        this.currentLevel = null;
+        this.deaths = 0;
+        this.seconds = 0;
+        this.timerInterval = null;
+
+        // Estados do Jogo: 'menu', 'playing', 'dead', 'won'
+        this.state = 'menu';
+
+        // Animações e efeitos de tela
+        this.screenShake = 0;
+        this.doorPulse = 0;
+        this.toastTimer = null;
+
+        // Entradas de controle
+        this.input = {
+          left: false,
+          right: false,
+          jumpPressed: false,
+          jumpJustPressed: false
+        };
+
+        this.initInput();
+        this.initUI();
+      }
+
+      initInput() {
+        // Controles de Teclado
+        window.addEventListener('keydown', (e) => {
+          sound.init();
+          const key = e.key.toLowerCase();
+
+          if (key === 'a' || key === 'arrowleft') {
+            this.input.left = true;
+          }
+          if (key === 'd' || key === 'arrowright') {
+            this.input.right = true;
+          }
+          if (key === 'w' || key === 'arrowup' || key === ' ' || key === 'spacebar') {
+            if (!this.input.jumpPressed) {
+              this.input.jumpJustPressed = true;
+            }
+            this.input.jumpPressed = true;
+
+            // Se estiver na tela de morte, espaço reinicia rápido
+            if (this.state === 'dead') {
+              this.restartLevel();
+            }
+          }
+          if (key === 'r') {
+            this.restartLevel();
+          }
+          if (key === 'm') {
+            this.toggleSound();
+          }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          const key = e.key.toLowerCase();
+          if (key === 'a' || key === 'arrowleft') {
+            this.input.left = false;
+          }
+          if (key === 'd' || key === 'arrowright') {
+            this.input.right = false;
+          }
+          if (key === 'w' || key === 'arrowup' || key === ' ' || key === 'spacebar') {
+            this.input.jumpPressed = false;
+          }
+        });
+
+        // Controles de Toque (Mobile) com Prevenção de Gestos Nativos
+        const setupTouch = (btnId, onDown, onUp) => {
+          const btn = document.getElementById(btnId);
+          if (!btn) return;
+
+          const handleDown = (e) => {
+            e.preventDefault();
+            sound.init();
+            btn.classList.add('active');
+            onDown();
+          };
+
+          const handleUp = (e) => {
+            e.preventDefault();
+            btn.classList.remove('active');
+            onUp();
+          };
+
+          btn.addEventListener('touchstart', handleDown, { passive: false });
+          btn.addEventListener('touchend', handleUp, { passive: false });
+          btn.addEventListener('touchcancel', handleUp, { passive: false });
+          btn.addEventListener('mousedown', handleDown);
+          btn.addEventListener('mouseup', handleUp);
+          btn.addEventListener('mouseleave', handleUp);
+        };
+
+        setupTouch('btn-touch-left',
+          () => { this.input.left = true; },
+          () => { this.input.left = false; }
+        );
+
+        setupTouch('btn-touch-right',
+          () => { this.input.right = true; },
+          () => { this.input.right = false; }
+        );
+
+        setupTouch('btn-touch-jump',
+          () => {
+            if (!this.input.jumpPressed) this.input.jumpJustPressed = true;
+            this.input.jumpPressed = true;
+            if (this.state === 'dead') this.restartLevel();
+          },
+          () => { this.input.jumpPressed = false; }
+        );
+      }
+
+      initUI() {
+        document.getElementById('btn-play-game').addEventListener('click', () => {
+          sound.init();
+          this.startGame();
+        });
+
+        document.getElementById('btn-retry-game').addEventListener('click', () => {
+          sound.init();
+          this.restartLevel();
+        });
+
+        document.getElementById('btn-play-again').addEventListener('click', () => {
+          sound.init();
+          this.deaths = 0;
+          this.seconds = 0;
+          this.currentLevelIndex = 0;
+          document.getElementById('win-overlay').classList.add('hidden');
+          this.startGame();
+        });
+
+        document.getElementById('btn-restart-fast').addEventListener('click', () => {
+          sound.init();
+          this.restartLevel();
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+          sound.init();
+          this.toggleSound();
+        });
+
+        document.getElementById('btn-menu').addEventListener('click', () => {
+          this.showMenu();
+        });
+      }
+
+      toggleSound() {
+        const isMuted = sound.toggleMute();
+        const btn = document.getElementById('btn-sound');
+        btn.textContent = isMuted ? '🔇 Mudo' : '🔊 Som';
+      }
+
+      showMenu() {
+        this.state = 'menu';
+        document.getElementById('menu-overlay').classList.remove('hidden');
+        document.getElementById('death-overlay').classList.add('hidden');
+        document.getElementById('win-overlay').classList.add('hidden');
+        clearInterval(this.timerInterval);
+      }
+
+      startGame() {
+        document.getElementById('menu-overlay').classList.add('hidden');
+        document.getElementById('death-overlay').classList.add('hidden');
+        document.getElementById('win-overlay').classList.add('hidden');
+
+        this.state = 'playing';
+        this.loadLevel(this.currentLevelIndex);
+
+        clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+          if (this.state === 'playing') {
+            this.seconds++;
+            this.updateTimerDisplay();
+          }
+        }, 1000);
+      }
+
+      updateTimerDisplay() {
+        const m = String(Math.floor(this.seconds / 60)).padStart(2, '0');
+        const s = String(this.seconds % 60).padStart(2, '0');
+        document.getElementById('hud-time').textContent = `⏱️ ${m}:${s}`;
+      }
+
+      loadLevel(index) {
+        this.currentLevelIndex = index;
+        // Clonagem profunda dos dados da fase para resetar armadilhas e posições
+        this.currentLevel = JSON.parse(JSON.stringify(LEVELS[index]));
+
+        // Inicializa plataformas instáveis
+        this.currentLevel.platforms.forEach(p => {
+          if (p.type === 'crumble') {
+            p.origY = p.y;
+            p.triggered = false;
+            p.shakeTime = 0;
+            p.fallSpeed = 0;
+          }
+          if (p.type === 'vanish') {
+            p.triggered = false;
+            p.vanishTimer = 0;
+            p.opacity = 1;
+          }
+          if (p.type === 'moving') {
+            p.dir = 1;
+          }
+        });
+
+        // Atualiza HUD
+        document.getElementById('hud-level').textContent = `Fase: ${index + 1} / ${LEVELS.length}`;
+        document.getElementById('hud-deaths').textContent = `💀 Mortes: ${this.deaths}`;
+
+        // Reseta jogador
+        this.player.reset(this.currentLevel.spawn.x, this.currentLevel.spawn.y);
+        this.particles.clear();
+        this.screenShake = 0;
+
+        // Esconde tela de morte
+        document.getElementById('death-overlay').classList.add('hidden');
+        this.state = 'playing';
+      }
+
+      restartLevel() {
+        this.loadLevel(this.currentLevelIndex);
+      }
+
+      killPlayer(reason = null) {
+        if (!this.player.alive) return;
+        this.player.alive = false;
+        this.state = 'dead';
+        this.deaths++;
+        this.screenShake = 16;
+        sound.die();
+
+        // Efeito de explosão em partículas coloridas
+        this.particles.createDeathExplosion(
+          this.player.x + this.player.width / 2,
+          this.player.y + this.player.height / 2
+        );
+
+        // Atualiza contador de mortes
+        document.getElementById('hud-deaths').textContent = `💀 Mortes: ${this.deaths}`;
+
+        // Exibe frase sarcástica
+        const quote = reason || DEATH_QUOTES[Math.floor(Math.random() * DEATH_QUOTES.length)];
+        document.getElementById('death-quote').textContent = `"${quote}"`;
+
+        // Mostra overlay de morte com leve delay para ver a explosão
+        setTimeout(() => {
+          if (this.state === 'dead') {
+            document.getElementById('death-overlay').classList.remove('hidden');
+          }
+        }, 280);
+      }
+
+      completeLevel() {
+        sound.levelClear();
+        this.particles.createConfetti(this.width, this.height);
+
+        if (this.currentLevelIndex < LEVELS.length - 1) {
+          // Próxima fase
+          this.showTrollToast("Fase Completa! Avançando...");
+          setTimeout(() => {
+            this.loadLevel(this.currentLevelIndex + 1);
+          }, 800);
+        } else {
+          // Vitória Total!
+          this.state = 'won';
+          sound.gameWon();
+          const m = String(Math.floor(this.seconds / 60)).padStart(2, '0');
+          const s = String(this.seconds % 60).padStart(2, '0');
+          document.getElementById('final-deaths').textContent = this.deaths;
+          document.getElementById('final-time').textContent = `${m}:${s}`;
+          document.getElementById('win-overlay').classList.remove('hidden');
+        }
+      }
+
+      showTrollToast(msg) {
+        const toast = document.getElementById('troll-toast');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 1800);
+      }
+
+      update() {
+        if (this.state === 'playing') {
+          // Atualiza jogador
+          this.player.update(this.input, this.currentLevel);
+
+          // Atualiza entidades e armadilhas do nível
+          this.updateLevelMechanics();
+        }
+
+        // Atualiza partículas em qualquer estado
+        this.particles.update();
+
+        // Limpa flag de pulo recém-pressionado
+        this.input.jumpJustPressed = false;
+
+        // Atenua tremor de tela
+        if (this.screenShake > 0) {
+          this.screenShake *= 0.88;
+          if (this.screenShake < 0.5) this.screenShake = 0;
+        }
+
+        // Pulso suave do portal
+        this.doorPulse += 0.05;
+      }
+
+      updateLevelMechanics() {
+        const lvl = this.currentLevel;
+        if (!lvl) return;
+
+        const playerBox = this.player.getHitbox();
+
+        // 1. Atualizar Zonas de Gravidade Alterada
+        let inGravityZone = false;
+        if (lvl.gravityZones) {
+          for (let gz of lvl.gravityZones) {
+            if (this.player.checkAABB(playerBox, gz)) {
+              inGravityZone = true;
+              if (!this.player.gravityInverted) {
+                this.player.gravityInverted = true;
+                this.showTrollToast("Gravidade Invertida!");
+                sound.trapTrigger();
+              }
+            }
+          }
+        }
+        if (!inGravityZone && this.player.gravityInverted) {
+          this.player.gravityInverted = false;
+          this.showTrollToast("Gravidade Normal!");
+        }
+
+        // 2. Plataformas Móveis e Instáveis
+        for (let plat of lvl.platforms) {
+          // Plataforma que se move
+          if (plat.type === 'moving') {
+            const oldX = plat.x;
+            plat.x += plat.speed * plat.dir;
+            if (plat.x > plat.maxX) {
+              plat.x = plat.maxX;
+              plat.dir = -1;
+            } else if (plat.x < plat.minX) {
+              plat.x = plat.minX;
+              plat.dir = 1;
+            }
+            const deltaX = plat.x - oldX;
+            // Se o jogador estiver em pé sobre a plataforma móvel, acompanha o movimento
+            if (this.player.isGrounded &&
+              this.player.y + this.player.height >= plat.y - 4 &&
+              this.player.y + this.player.height <= plat.y + 4 &&
+              this.player.x + this.player.width > plat.x &&
+              this.player.x < plat.x + plat.w) {
+              this.player.x += deltaX;
+            }
+          }
+
+          // Plataforma que treme e cai
+          if (plat.type === 'crumble' && plat.triggered) {
+            if (plat.shakeTime > 0) {
+              plat.shakeTime--;
+              plat.x += (Math.random() - 0.5) * 4;
+            } else {
+              plat.fallSpeed += 0.6;
+              plat.y += plat.fallSpeed;
+              if (plat.y > 600) {
+                plat.solid = false; // Caiu no abismo
+              }
+            }
+          }
+
+          // Plataforma fantasma que desaparece
+          if (plat.type === 'vanish' && plat.triggered) {
+            if (plat.vanishTimer > 0) {
+              plat.vanishTimer--;
+              plat.opacity = plat.vanishTimer / 14;
+            } else {
+              plat.solid = false;
+              plat.opacity = 0;
+            }
+          }
+        }
+
+        // 3. Esmagadores do Teto (Crushers)
+        if (lvl.crushers) {
+          for (let c of lvl.crushers) {
+            if (c.state === 'idle') {
+              // Dispara se o jogador se aproximar da zona
+              if (this.player.x > c.triggerX && this.player.x < c.x + c.w + 60) {
+                c.state = 'dropping';
+                sound.trapTrigger();
+                this.showTrollToast("CUIDADO COM O TETO!");
+              }
+            } else if (c.state === 'dropping') {
+              c.y += 11; // Despenca em alta velocidade!
+              if (c.y >= c.targetY) {
+                c.y = c.targetY;
+                c.state = 'hit';
+                this.screenShake = 12;
+                sound.bonk();
+                setTimeout(() => { c.state = 'rising'; }, 700);
+              }
+            } else if (c.state === 'rising') {
+              c.y -= 2;
+              if (c.y <= c.startY) {
+                c.y = c.startY;
+                c.state = 'idle';
+              }
+            }
+
+            // Colisão letal com o esmagador enquanto ele desce
+            if (c.state === 'dropping' || c.state === 'hit') {
+              if (this.player.checkAABB(playerBox, { x: c.x, y: c.y, w: c.w, h: c.h })) {
+                this.killPlayer("Foi esmagado como uma panqueca pelo teto!");
+                return;
+              }
+            }
+          }
+        }
+
+        // 4. Espinhos e Armadilhas Mortais
+        for (let sp of lvl.spikes) {
+          // Espinhos surpresa que saltam do chão ao se aproximar
+          if (sp.type === 'popup' && !sp.popped) {
+            const dist = Math.hypot(this.player.x - sp.x, this.player.y - sp.y);
+            if (dist < sp.triggerDist) {
+              sp.popped = true;
+              sp.y -= sp.h; // Sobe instantaneamente para a superfície!
+              sound.trapTrigger();
+              this.showTrollToast("Espinho surpresa!");
+            }
+          }
+
+          // Espinho que aparece após a porta fugir (Fase 4)
+          if (sp.type === 'popup_on_flee' && lvl.door.fled && !sp.popped) {
+            sp.popped = true;
+          }
+
+          // Espinhos que caem do teto (Fase 3)
+          if (sp.type === 'falling') {
+            if (!sp.triggered && Math.abs(this.player.x - sp.x) < 45 && this.player.y > sp.y) {
+              sp.triggered = true;
+              sound.trapTrigger();
+            }
+            if (sp.triggered) {
+              sp.vy = (sp.vy || 0) + 0.65;
+              sp.y += sp.vy;
+            }
+          }
+
+          // Verificação de Colisão com Espinhos
+          if (sp.type === 'popup' && !sp.popped) continue;
+          if (sp.type === 'popup_on_flee' && !sp.popped) continue;
+
+          // Hitbox precisa do espinho triangular
+          const spikeBox = {
+            x: sp.x + 4,
+            y: sp.y + 4,
+            w: sp.w - 8,
+            h: sp.h - 6
+          };
+
+          if (this.player.checkAABB(playerBox, spikeBox)) {
+            this.killPlayer("Espetado sem dó nem piedade!");
+            return;
+          }
+        }
+
+        // 5. Porta de Saída e Mecânica da Porta Fujona
+        const door = lvl.door;
+        const distToDoor = Math.hypot(this.player.x - door.x, this.player.y - door.y);
+
+        if (door.type === 'runaway' && !door.fled) {
+          if (distToDoor < 85) {
+            door.fled = true;
+            door.x = door.targetX;
+            sound.trollLaugh();
+            this.showTrollToast("A porta fugiu! 'Pega se puder!' 😈");
+            this.particles.createConfetti(this.width, this.height);
+          }
+        }
+
+        // Alcançou a porta!
+        if (this.player.checkAABB(playerBox, door)) {
+          this.completeLevel();
+        }
+      }
+
+      draw() {
+        this.ctx.save();
+
+        // Efeito de Tremor de Tela
+        if (this.screenShake > 0) {
+          const shakeX = (Math.random() - 0.5) * this.screenShake;
+          const shakeY = (Math.random() - 0.5) * this.screenShake;
+          this.ctx.translate(shakeX, shakeY);
+        }
+
+        // 1. Limpar Fundo Escuro com Gradiente
+        const bgGrad = this.ctx.createLinearGradient(0, 0, 0, this.height);
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(1, '#020617');
+        this.ctx.fillStyle = bgGrad;
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // Grade sutil decorativa de fundo
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+        this.ctx.lineWidth = 1;
+        for (let x = 0; x < this.width; x += 40) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(x, 0);
+          this.ctx.lineTo(x, this.height);
+          this.ctx.stroke();
+        }
+        for (let y = 0; y < this.height; y += 40) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, y);
+          this.ctx.lineTo(this.width, y);
+          this.ctx.stroke();
+        }
+
+        // Se estiver em jogo ativo
+        if (this.currentLevel) {
+          // 2. Desenhar Zonas de Gravidade
+          if (this.currentLevel.gravityZones) {
+            for (let gz of this.currentLevel.gravityZones) {
+              this.ctx.fillStyle = gz.color;
+              this.ctx.fillRect(gz.x, gz.y, gz.w, gz.h);
+
+              // Setinhas animadas subindo para indicar gravidade invertida
+              this.ctx.fillStyle = 'rgba(168, 85, 247, 0.4)';
+              const time = Date.now() * 0.003;
+              for (let ax = gz.x + 30; ax < gz.x + gz.w; ax += 80) {
+                const ay = ((gz.y + gz.h) - ((time * 40 + ax) % gz.h));
+                this.ctx.beginPath();
+                this.ctx.moveTo(ax, ay);
+                this.ctx.lineTo(ax - 8, ay + 12);
+                this.ctx.lineTo(ax + 8, ay + 12);
+                this.ctx.fill();
+              }
+            }
+          }
+
+          // 3. Desenhar Plataformas
+          for (let plat of this.currentLevel.platforms) {
+            this.ctx.save();
+            if (plat.type === 'vanish') {
+              this.ctx.globalAlpha = plat.opacity !== undefined ? plat.opacity : 1;
+            }
+
+            // Plataformas claras e elegantes
+            this.ctx.fillStyle = plat.color || '#e2e8f0';
+            this.ctx.beginPath();
+            this.ctx.roundRect(plat.x, plat.y, plat.w, plat.h, 4);
+            this.ctx.fill();
+
+            // Borda superior iluminada para dar profundidade
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillRect(plat.x, plat.y, plat.w, 3);
+
+            // Se for plataforma que desmorona, desenha pequenas ranhuras de aviso
+            if (plat.type === 'crumble') {
+              this.ctx.strokeStyle = '#94a3b8';
+              this.ctx.lineWidth = 1.5;
+              this.ctx.beginPath();
+              this.ctx.moveTo(plat.x + 10, plat.y + 4);
+              this.ctx.lineTo(plat.x + 20, plat.y + 14);
+              this.ctx.moveTo(plat.x + plat.w - 20, plat.y + 4);
+              this.ctx.lineTo(plat.x + plat.w - 10, plat.y + 14);
+              this.ctx.stroke();
+            }
+
+            this.ctx.restore();
+          }
+
+          // 4. Desenhar Blocos Invisíveis (mostra contorno somente quando revelado)
+          for (let ib of this.currentLevel.invisibleBlocks) {
+            if (ib.revealed) {
+              this.ctx.fillStyle = '#334155';
+              this.ctx.beginPath();
+              this.ctx.roundRect(ib.x, ib.y, ib.w, ib.h, 4);
+              this.ctx.fill();
+
+              this.ctx.strokeStyle = '#38bdf8';
+              this.ctx.lineWidth = 2;
+              this.ctx.stroke();
+
+              // Ícone de interrogação troll
+              this.ctx.fillStyle = '#38bdf8';
+              this.ctx.font = 'bold 16px sans-serif';
+              this.ctx.textAlign = 'center';
+              this.ctx.textBaseline = 'middle';
+              this.ctx.fillText('?', ib.x + ib.w / 2, ib.y + ib.h / 2);
+            }
+          }
+
+          // 5. Desenhar Esmagadores (Crushers)
+          if (this.currentLevel.crushers) {
+            for (let c of this.currentLevel.crushers) {
+              // Corpo de pedra/metal ameaçador
+              this.ctx.fillStyle = '#475569';
+              this.ctx.fillRect(c.x, c.y, c.w, c.h);
+
+              // Dentes ou espinhos na parte inferior do esmagador
+              this.ctx.fillStyle = '#ef4444';
+              const teethCount = Math.floor(c.w / 15);
+              const toothW = c.w / teethCount;
+              for (let i = 0; i < teethCount; i++) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(c.x + i * toothW, c.y + c.h);
+                this.ctx.lineTo(c.x + (i + 0.5) * toothW, c.y + c.h + 12);
+                this.ctx.lineTo(c.x + (i + 1) * toothW, c.y + c.h);
+                this.ctx.fill();
+              }
+
+              // Detalhe de textura
+              this.ctx.strokeStyle = '#64748b';
+              this.ctx.lineWidth = 2;
+              this.ctx.strokeRect(c.x + 4, c.y + 4, c.w - 8, c.h - 8);
+            }
+          }
+
+          // 6. Desenhar Espinhos Vermelhos Vibrantes
+          for (let sp of this.currentLevel.spikes) {
+            if (sp.type === 'popup' && !sp.popped) continue;
+            if (sp.type === 'popup_on_flee' && !sp.popped) continue;
+
+            this.ctx.fillStyle = '#ef4444'; // Vermelho clássico de perigo
+            this.ctx.beginPath();
+
+            if (sp.dir === 'up') {
+              this.ctx.moveTo(sp.x, sp.y + sp.h);
+              this.ctx.lineTo(sp.x + sp.w / 2, sp.y);
+              this.ctx.lineTo(sp.x + sp.w, sp.y + sp.h);
+            } else if (sp.dir === 'down') {
+              this.ctx.moveTo(sp.x, sp.y);
+              this.ctx.lineTo(sp.x + sp.w / 2, sp.y + sp.h);
+              this.ctx.lineTo(sp.x + sp.w, sp.y);
+            } else if (sp.dir === 'right') {
+              this.ctx.moveTo(sp.x, sp.y);
+              this.ctx.lineTo(sp.x + sp.w, sp.y + sp.h / 2);
+              this.ctx.lineTo(sp.x, sp.y + sp.h);
+            } else {
+              this.ctx.moveTo(sp.x + sp.w, sp.y);
+              this.ctx.lineTo(sp.x, sp.y + sp.h / 2);
+              this.ctx.lineTo(sp.x + sp.w, sp.y + sp.h);
+            }
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            // Brilho na ponta afiada
+            this.ctx.fillStyle = '#fca5a5';
+            this.ctx.beginPath();
+            if (sp.dir === 'up') {
+              this.ctx.arc(sp.x + sp.w / 2, sp.y + 3, 2, 0, Math.PI * 2);
+            } else {
+              this.ctx.arc(sp.x + sp.w / 2, sp.y + sp.h - 3, 2, 0, Math.PI * 2);
+            }
+            this.ctx.fill();
+          }
+
+          // 7. Desenhar Porta Roxa (Portal Místico Animado)
+          const door = this.currentLevel.door;
+          this.ctx.save();
+          // Brilho externo pulsante
+          const glow = Math.sin(this.doorPulse) * 4 + 8;
+          this.ctx.shadowColor = '#a855f7';
+          this.ctx.shadowBlur = glow;
+
+          // Moldura da Porta
+          this.ctx.fillStyle = '#581c87';
+          this.ctx.beginPath();
+          this.ctx.roundRect(door.x, door.y, door.w, door.h, [16, 16, 2, 2]);
+          this.ctx.fill();
+
+          // Vórtice interno do portal
+          const portalGrad = this.ctx.createRadialGradient(
+            door.x + door.w / 2, door.y + door.h / 2, 2,
+            door.x + door.w / 2, door.y + door.h / 2, door.w / 2
+          );
+          portalGrad.addColorStop(0, '#f0abfc');
+          portalGrad.addColorStop(0.5, '#a855f7');
+          portalGrad.addColorStop(1, '#3b0764');
+
+          this.ctx.fillStyle = portalGrad;
+          this.ctx.beginPath();
+          this.ctx.roundRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8, [12, 12, 0, 0]);
+          this.ctx.fill();
+
+          // Espiral de partículas roxas na porta
+          this.ctx.fillStyle = '#ffffff';
+          const pAngle = this.doorPulse * 2;
+          const px = door.x + door.w / 2 + Math.cos(pAngle) * 6;
+          const py = door.y + door.h / 2 + Math.sin(pAngle) * 10;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+          this.ctx.fill();
+
+          this.ctx.restore();
+
+          // 8. Desenhar o Jogador
+          this.player.draw(this.ctx);
+        }
+
+        // 9. Desenhar Sistema de Partículas
+        this.particles.draw(this.ctx);
+
+        this.ctx.restore();
+      }
+
+      loop() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+      }
+    }
+
+    // Inicialização da instância global do jogo
+    let game;
+    window.addEventListener('DOMContentLoaded', () => {
+      game = new Game();
+      game.loop();
+    });
+  </script>
+</body>
+
+</html>
